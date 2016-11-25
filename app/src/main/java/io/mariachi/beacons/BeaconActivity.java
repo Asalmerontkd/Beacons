@@ -18,7 +18,8 @@ import org.altbeacon.beacon.Region;
 import java.util.Collection;
 
 public class BeaconActivity extends AppCompatActivity implements BeaconConsumer {
-    TextView salida;
+    TextView estado;
+    TextView distancia;
     private BeaconManager beaconManager;
     public static final String TAG = "BeaconsEverywhere";
 
@@ -26,7 +27,8 @@ public class BeaconActivity extends AppCompatActivity implements BeaconConsumer 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_beacon);
-        salida = (TextView) findViewById(R.id.txtAlgo);
+        estado = (TextView) findViewById(R.id.txtEstado);
+        distancia = (TextView) findViewById(R.id.txtBeacon);
 
         beaconManager = BeaconManager.getInstanceForApplication(this);
         beaconManager.getBeaconParsers().add(new BeaconParser()
@@ -40,15 +42,23 @@ public class BeaconActivity extends AppCompatActivity implements BeaconConsumer 
         beaconManager.unbind(this);
     }
 
+    //Identifier.parse("23a01af0-232a-4518-9c0e-323fb773f5ef")
+
     @Override
     public void onBeaconServiceConnect() {
-        final Region region = new Region("myBeaons", Identifier.parse("23a01af0-232a-4518-9c0e-323fb773f5ef"), null, null);
+        final Region region = new Region("myBeaons", null, null, null);
 
         beaconManager.setMonitorNotifier(new MonitorNotifier() {
             @Override
             public void didEnterRegion(Region region) {
                 try {
-                    Log.d(TAG, "didEnterRegion");
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            estado.setText("Beacon dentro de la región.");
+                        }
+                    });
+                    Log.d(TAG, "Beacon dentro de la región.");
                     beaconManager.startRangingBeaconsInRegion(region);
                 } catch (RemoteException e) {
                     e.printStackTrace();
@@ -58,7 +68,14 @@ public class BeaconActivity extends AppCompatActivity implements BeaconConsumer 
             @Override
             public void didExitRegion(Region region) {
                 try {
-                    Log.d(TAG, "didExitRegion");
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            estado.setText("Beacon Fuera de la región.");
+                            distancia.setText("");
+                        }
+                    });
+                    Log.d(TAG, "Beacon Fuera de la región.");
                     beaconManager.stopRangingBeaconsInRegion(region);
                 } catch (RemoteException e) {
                     e.printStackTrace();
@@ -73,12 +90,25 @@ public class BeaconActivity extends AppCompatActivity implements BeaconConsumer 
 
         beaconManager.setRangeNotifier(new RangeNotifier() {
             @Override
-            public void didRangeBeaconsInRegion(Collection<Beacon> beacons, Region region) {
-                for(final Beacon oneBeacon : beacons) {
+            public void didRangeBeaconsInRegion(final Collection<Beacon> collection, Region region) {
+                for(final Beacon oneBeacon : collection) {
+
+                    final double precision;
+                    double ratio = oneBeacon.getRssi()*1.0/oneBeacon.getTxPower();
+                    if (ratio < 1.0)
+                    {
+                        precision = Math.pow(ratio, 10);
+                    }
+                    else
+                    {
+                        precision = (0.89976)*Math.pow(ratio,7.7095) + 0.111;
+                    }
+
+
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            salida.setText("distance: " + oneBeacon.getDistance() + "\n id:" + oneBeacon.getId1() + " / " + oneBeacon.getId2() + " / " + oneBeacon.getId3());
+                            distancia.setText("Distancia: " + oneBeacon.getDistance() +"\nPrecisión: "+ precision +"\n id:" + oneBeacon.getId1() + " / " + oneBeacon.getId2() + " / " + oneBeacon.getId3());
                         }
                     });
 
